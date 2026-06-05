@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# msyw-init — set up a must-show-your-work workspace.
+#
+# Clones shed (the manifest repo) into the target directory, then
+# initializes a west workspace from shed/west.yml and pulls every
+# org-side project listed there as sibling clones.
+#
+# Prerequisites:
+#   - git on PATH
+#   - either `west` on PATH OR `nix` (we'll drop into shed's
+#     devshell, which provides west, on demand).
+#
+# Usage:
+#   msyw-init                  # use the current directory as the workspace
+#   msyw-init my-msyw          # create ./my-msyw and use that
+
+set -euo pipefail
+
+target="${1:-.}"
+mkdir -p "$target"
+cd "$target"
+
+if [ ! -d shed ]; then
+  echo "msyw-init: cloning shed…"
+  git clone https://github.com/must-show-your-work/shed.git
+fi
+
+run_west() {
+  if command -v west >/dev/null 2>&1; then
+    west "$@"
+  elif command -v nix >/dev/null 2>&1; then
+    nix develop --quiet ./shed -c west "$@"
+  else
+    echo "msyw-init: need 'west' or 'nix' on PATH" >&2
+    exit 1
+  fi
+}
+
+if [ ! -d .west ]; then
+  echo "msyw-init: bootstrapping west from shed/west.yml…"
+  run_west init -l shed
+fi
+
+echo "msyw-init: pulling projects…"
+run_west update
+
+cat <<EOF
+
+msyw-init: workspace ready at $(pwd)
+
+Next:
+  cd $(pwd)
+  nix develop ./shed   # standard dev environment (Lean toolchain etc.)
+EOF

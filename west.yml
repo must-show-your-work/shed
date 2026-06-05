@@ -1,0 +1,52 @@
+# west manifest for the must-show-your-work workspace.
+#
+# This file is the source of truth for which repos belong to the org
+# and what revisions the workspace pins them at. `west init -l shed`
+# (run once at the MSYW root) bootstraps the workspace from this
+# manifest; `west update` thereafter clones/updates the listed projects
+# into siblings of `shed/`.
+#
+# Self note: the manifest repo (shed) is itself in the workspace at
+# `self.path` and is NOT cloned by `west update` — it has to already
+# be present for west to read this file.
+
+manifest:
+  defaults:
+    remote: msyw
+    revision: main
+
+  remotes:
+    - name: msyw
+      url-base: https://github.com/must-show-your-work
+    # Personal-fork remote: used for projects whose upstream lives in
+    # Joe's account (e.g., forks of community libraries being formalized
+    # under MSYW). Migrate to msyw once an org-side fork is set up.
+    - name: jfredett
+      url-base: https://github.com/jfredett
+
+  projects:
+    - name: atlas
+      path: atlas
+    - name: figures
+      path: figures
+    - name: geometry-is-your-friend
+      path: geometry-is-your-friend
+    # name-brand-math: Tao's analysis + future analysis / measure theory
+    # work. Upstream is jfredett/analysis (a fork); local path uses the
+    # MSYW-side project name so the rename is just a manifest edit when
+    # the org-side fork lands.
+    - name: name-brand-math
+      remote: jfredett
+      repo-path: analysis
+      path: name-brand-math
+    - name: letters
+      path: letters
+    - name: every-waking-moment
+      path: every-waking-moment
+    # GitHub org-level landing page — `profile/README.md` renders on the
+    # org's public page at github.com/must-show-your-work.
+    - name: profile
+      path: profile
+
+  self:
+    path: shed
