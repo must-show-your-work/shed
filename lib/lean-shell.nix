@@ -1,0 +1,78 @@
+{ pkgs
+, system
+, nixpkgs
+, lean4-nix
+, manifest
+, extraPackages ? []
+, extraShellHook ? ""
+, name ? "lean shell"
+}:
+let
+  leanToolchain = pkgs.callPackage "${lean4-nix.outPath}/lib/toolchain.nix" {};
+  leanBin = leanToolchain.fetchBinaryLean manifest;
+  leanOverlay = final: prev: { lean = leanBin; };
+  pkgsLean = import nixpkgs {
+    inherit system;
+    overlays = [ leanOverlay ];
+  };
+in
+pkgsLean.mkShell {
+  inherit name;
+
+  packages = [
+    pkgsLean.lean
+    pkgs.elan
+    pkgs.git
+    pkgs.just
+  ] ++ extraPackages;
+
+  shellHook = ''
+    # ANG-642: prepend lean4-nix-built bin so it wins over any
+    # `lean4-elan-stub` shim inherited from an outer shell. The stub's
+    # `readlink -f $0` + PATH-strip self-loop fork-bombs when invoked
+    # under nix-develop, pinning CPU with no output. Load-bearing.
+    export PATH="${pkgsLean.lean}/bin:$PATH"
+
+    # Atlas tooling — make `atlas` resolvable as a bare command in any
+    # project that depends on atlas (via Lake). Three resolution
+    # strategies, in order of accuracy:
+    #   1. `lake-manifest.json` — `.packages[].dir` for the atlas entry
+    #      reflects whatever path-based `require atlas from "..."` form
+    #      the consumer used. Works for monorepo siblings, vendored
+    #      copies, or anywhere else Lake was told to look.
+    #   2. `.lake/packages/atlas/bin` — the standard Lake-packages
+    #      layout after a Git-style `require atlas from git "..."`.
+    #   3. `./bin/atlas` — covers running from inside the atlas repo
+    #      itself.
+    # Missing directories are silently skipped so projects without
+    # atlas don't pay for this.
+    __atlas_dir=""
+    if [ -r "$PWD/lake-manifest.json" ] && command -v jq >/dev/null 2>&1; then
+      __atlas_dir_rel="$(jq -r '
+        .packages[]?
+        | select(.name == "atlas")
+        | .dir // empty
+      ' < "$PWD/lake-manifest.json" 2>/dev/null)"
+      if [ -n "$__atlas_dir_rel" ]; then
+        case "$__atlas_dir_rel" in
+          /*) __atlas_dir="$__atlas_dir_rel" ;;
+          *)  __atlas_dir="$PWD/$__atlas_dir_rel" ;;
+        esac
+      fi
+    fi
+    if [ -z "$__atlas_dir" ] && [ -d "$PWD/.lake/packages/atlas" ]; then
+      __atlas_dir="$PWD/.lake/packages/atlas"
+    fi
+    if [ -z "$__atlas_dir" ] && [ -x "$PWD/bin/atlas" ]; then
+      __atlas_dir="$PWD"
+    fi
+    if [ -n "$__atlas_dir" ] && [ -x "$__atlas_dir/bin/atlas" ]; then
+      export PATH="$__atlas_dir/bin:$PATH"
+    fi
+    unset __atlas_dir __atlas_dir_rel
+
+    # nixpkgs #409490: `lake build` fails with the default gcc linker
+    # on NixOS. Switch to clang.
+    export LEAN_CC=clang
+  '' + extraShellHook;
+}
