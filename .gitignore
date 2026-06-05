@@ -1,12 +1,26 @@
-# Allowlist gitignore: everything ignored by default; opt in below.
-# Add a new tracked path by appending `!/<path>` (and the directory's
-# parents, if any). Subdirectory contents follow normal rules once the
-# directory itself is un-ignored.
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+# Ephemeral agent-fetched tokens (e.g. balrog leader token pulled from Vault).
+# Treat like .env: file is local-only, never goes in history.
+.agent-tokens
 
-/*
+# Local-only Claude settings (the shared settings.json, if any, may be tracked)
+.claude/settings.local.json
 
-!/.gitignore
-!/README.md
-!/flake.nix
-!/flake.lock
-!/lib/
+# Direnv / nix dev shell caches
+.direnv/
+result
+result-*
+
+# Python venvs
+.venv/
+
+# Editor / OS scratch
+*.swp
+*~
+.DS_Store
+
+# Source-text PDFs (copyrighted textbook material — never publish).
+sources/
