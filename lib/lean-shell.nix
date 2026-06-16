@@ -91,16 +91,19 @@ pkgsLean.mkShell {
     unset __msyw_root
   '' + extraShellHook + ''
 
-    # Prepend Lean's bundled `lib/` to LIBRARY_PATH AFTER consumer
-    # extraShellHook so `lake exe`'s linker finds the Lean-bundled
-    # libc++.a (which has `__atomic_wait_native` / `__atomic_notify_one_native`
-    # that libleanrt.a needs) BEFORE any nixpkgs libcxx the consumer
-    # added. Without this AFTER-hook position, consumer's prepend pushes
-    # nixpkgs libcxx ahead and cache:exe fails to link. Strip any
-    # existing leanBin/lib entries first to keep the path tidy.
-    __leanlib="${leanBin}/lib"
-    LIBRARY_PATH="$(echo "''${LIBRARY_PATH:-}" | tr ':' '\n' | grep -v "^$__leanlib\$" | paste -sd: -)"
-    export LIBRARY_PATH="$__leanlib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
-    unset __leanlib
+    # Prepend the REAL Lean lib/ to LIBRARY_PATH (after consumer hook).
+    # The `${leanBin}` path is a thin stub whose `bin/` symlinks to the
+    # underlying lean toolchain; the actual `lib/libc++.a` (with the
+    # `__atomic_wait_native` / `__atomic_notify_one_native` symbols
+    # libleanrt.a needs) lives at the symlink-target. Resolve via
+    # readlink. Without this, `lake exe cache get` fails because the
+    # linker picks up a nixpkgs libcxx missing those symbols.
+    __real_lean_bin="$(readlink -f "${leanBin}/bin/lean" 2>/dev/null || true)"
+    if [ -n "$__real_lean_bin" ]; then
+      __real_lean_lib="$(dirname "$(dirname "$__real_lean_bin")")/lib"
+      LIBRARY_PATH="$(echo "''${LIBRARY_PATH:-}" | tr ':' '\n' | grep -v "^$__real_lean_lib\$" | paste -sd: -)"
+      export LIBRARY_PATH="$__real_lean_lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    fi
+    unset __real_lean_bin __real_lean_lib
   '';
 }
