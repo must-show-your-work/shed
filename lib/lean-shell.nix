@@ -2,7 +2,7 @@
 , system
 , nixpkgs
 , lean4-nix
-, manifest
+, manifest ? import ./lean-toolchain-manifest.nix
 , extraPackages ? []
 , extraShellHook ? ""
 , name ? "lean shell"
@@ -74,5 +74,20 @@ pkgsLean.mkShell {
     # nixpkgs #409490: `lake build` fails with the default gcc linker
     # on NixOS. Switch to clang.
     export LEAN_CC=clang
+
+    # Mathlib's `lake exe cache get` honors XDG_CACHE_HOME (falling back
+    # to ~/.cache/mathlib). On systems where $HOME lives on a small
+    # volume, point the cache at the msyw workspace root's `.cache/`
+    # instead. Detection: walk up from $PWD until we find a directory
+    # containing `shed/west.yml` (the msyw root marker). No-op outside
+    # an msyw workspace.
+    __msyw_root="$PWD"
+    while [ "$__msyw_root" != "/" ] && [ ! -f "$__msyw_root/shed/west.yml" ]; do
+      __msyw_root="$(dirname "$__msyw_root")"
+    done
+    if [ -f "$__msyw_root/shed/west.yml" ]; then
+      export XDG_CACHE_HOME="$__msyw_root/.cache"
+    fi
+    unset __msyw_root
   '' + extraShellHook;
 }

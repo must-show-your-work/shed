@@ -43,10 +43,22 @@ manifest:
       path: letters
     - name: every-waking-moment
       path: every-waking-moment
+    # high-tide: Vakil's *The Rising Sea*. No remote yet — entry stays
+    # but org-side repo isn't created. `west update` will skip it
+    # gracefully (or error; verify when the remote lands).
+    - name: high-tide
+      path: high-tide
     # GitHub org-level landing page — `profile/README.md` renders on the
     # org's public page at github.com/must-show-your-work.
     - name: profile
       path: profile
+    # Forks (per shed/forks/<name>.md). Tracking main; pin to a
+    # specific `revision:` when we need to lock against an upstream
+    # bump that hasn't been merged through us yet.
+    - name: LeanTeX
+      path: LeanTeX
+    - name: lean.nvim
+      path: lean.nvim
 
   self:
     path: shed
