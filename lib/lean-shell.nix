@@ -75,6 +75,15 @@ pkgsLean.mkShell {
     # on NixOS. Switch to clang.
     export LEAN_CC=clang
 
+    # Prepend Lean's bundled `lib/` to LIBRARY_PATH so `lake exe`'s
+    # linker finds the Lean-bundled libc++.a / libc++abi (which match
+    # libleanrt.a's symbol expectations: `__atomic_wait_native` etc.)
+    # BEFORE any nixpkgs-provided libcxx that the consumer flake may
+    # have added later in extraShellHook. Without this prepend, the
+    # nixpkgs libcxx wins the link and cache:exe fails with undefined
+    # references to `std::__1::__atomic_wait_native<4ul>`.
+    export LIBRARY_PATH="${leanBin}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+
     # Mathlib's `lake exe cache get` honors XDG_CACHE_HOME (falling back
     # to ~/.cache/mathlib). On systems where $HOME lives on a small
     # volume, point the cache at the msyw workspace root's `.cache/`
