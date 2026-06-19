@@ -15,6 +15,12 @@ let
     inherit system;
     overlays = [ leanOverlay ];
   };
+  # Native-extension run-time loader path. Python packages that ship
+  # a C++ shared object (kuzu's `_kuzu.so`, etc.) need libstdc++ at
+  # dlopen time; without this they fail with
+  # `libstdc++.so.6: cannot open shared object file`. Same role as
+  # the workspace devShell's `runtimeLibs`.
+  runtimeLibs = [ pkgs.stdenv.cc.cc.lib ];
 in
 pkgsLean.mkShell {
   inherit name;
@@ -32,6 +38,9 @@ pkgsLean.mkShell {
     # `readlink -f $0` + PATH-strip self-loop fork-bombs when invoked
     # under nix-develop, pinning CPU with no output. Load-bearing.
     export PATH="${pkgsLean.lean}/bin:$PATH"
+
+    # Run-time loader path — see `runtimeLibs` above.
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
     # Atlas tooling — make `atlas` resolvable as a bare command in any
     # project that depends on atlas (via Lake). Three resolution
