@@ -72,6 +72,39 @@
 
           shellHook = ''
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+            # Atlas tooling — same detection as `lib/lean-shell.nix`. Lifted
+            # here so `nix develop ../shed` from inside an atlas checkout
+            # (or any project depending on atlas via Lake) puts `atlas`
+            # on PATH without needing the consumer's own flake. Three
+            # resolution strategies in order of accuracy:
+            #   1. `lake-manifest.json` — `.packages[].dir` for atlas.
+            #   2. `.lake/packages/atlas/bin` — Git-style Lake layout.
+            #   3. `./bin/atlas` — running from inside the atlas repo.
+            __atlas_dir=""
+            if [ -r "$PWD/lake-manifest.json" ] && command -v jq >/dev/null 2>&1; then
+              __atlas_dir_rel="$(jq -r '
+                .packages[]?
+                | select(.name == "atlas")
+                | .dir // empty
+              ' < "$PWD/lake-manifest.json" 2>/dev/null)"
+              if [ -n "$__atlas_dir_rel" ]; then
+                case "$__atlas_dir_rel" in
+                  /*) __atlas_dir="$__atlas_dir_rel" ;;
+                  *)  __atlas_dir="$PWD/$__atlas_dir_rel" ;;
+                esac
+              fi
+            fi
+            if [ -z "$__atlas_dir" ] && [ -d "$PWD/.lake/packages/atlas" ]; then
+              __atlas_dir="$PWD/.lake/packages/atlas"
+            fi
+            if [ -z "$__atlas_dir" ] && [ -x "$PWD/bin/atlas" ]; then
+              __atlas_dir="$PWD"
+            fi
+            if [ -n "$__atlas_dir" ] && [ -x "$__atlas_dir/bin/atlas" ]; then
+              export PATH="$__atlas_dir/bin:$PATH"
+            fi
+            unset __atlas_dir __atlas_dir_rel
           '';
         };
       };
